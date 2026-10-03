@@ -20,14 +20,11 @@ def run_final_evaluation(dataset_dir: str, backbone: str):
     print(f"Loading all CSVs from {dataset_dir} for final evaluation...")
     
     # Load all CSVs to get a broader distribution
-    csv_files = list(Path(dataset_dir).glob("*.csv"))
-    if not csv_files:
-        print("No CSV files found.")
-        return
-        
-    # Read and concatenate (using first 2 files for speed if many exist, or just 1 if specified)
-    # Ideally, in a full run, we read all of them.
-    df = pl.scan_csv(str(csv_files[0]), ignore_errors=True, infer_schema_length=10000)
+    csv_pattern = os.path.join(dataset_dir, "*.csv")
+    print(f"Scanning pattern: {csv_pattern}")
+    
+    # Use Polars to lazy scan all matching CSVs
+    df = pl.scan_csv(csv_pattern, ignore_errors=True, infer_schema_length=10000)
     flows_df = build_flow_records(df).collect()
     
     print("Building stream and windows...")
