@@ -150,7 +150,7 @@ def run_final_evaluation(dataset_dir: str, backbone: str):
 - **Model Backbone:** {backbone}
 - **Dataset Dir:** {dataset_dir}
 - **Window Size:** 256
-- **Test Windows:** {len(test_windows)}
+- **Test Windows:** {len(X_test)}
 
 ## Window-Level Metrics (P-A Split)
 - **Macro-F1:** {metrics.get('macro_f1', 0):.4f} (95% CI: {lower:.4f} - {upper:.4f})
