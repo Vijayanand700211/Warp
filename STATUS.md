@@ -1,6 +1,5 @@
-Current phase: P3      Last tag: phase-P2-stream-windows      main green: yes
-Done: P0 (Scaffold), P1 (Dataset Audit), P2 (Wavelet/Entropy Features, Stream, Splits)
-In progress: P6 (Model Training / Evaluation)
+Current phase: P8      Last tag: config-freeze      main green: yes
+Done: P0 ✔ P1 ✔ P2 ✔ P3 ✔ P4 ✔ P5 ✔ P6 ✔ P7 ✔
+In progress: P8 (Serving, Latency, Packaging, Docs, Release)
 Blockers: none
-Next action: The user should run `tools/train_model.py` in Colab to evaluate M-main-1, M-main-2, and M-floor.
-
+Next action: Implement serve/state.py and serve/infer.py for the streaming ONNX inference service.
