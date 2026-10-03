@@ -36,3 +36,18 @@ CIC-DDoS2019 CSVs are heavily attack-dominated (99.8% attack flows). The benign 
 **Option 2 is the correct next step.** The initial deep audit script checked for the *presence* of >0 attack flows, but `TASK.md` §8.3 specifies that an attack window must have an attack flow fraction ≥ `τ` (default 0.5) in its tail. 
 
 We will pause P1, update the `audit_dataset_deep.py` script to use the exact `τ=0.5` rule from the spec, and re-run the window feasibility check. If it still fails, we will consider Option 1 (reducing window size).
+
+---
+
+## Resolution (2026-10-03)
+**Status: RESOLVED**
+
+As implemented in commit `8c07b93` and executed across the full dataset:
+- Applying the spec-compliant tail classification ($\tau \ge 0.5$ in the trailing 16 bins and $\ge 5$ attack flows) yields:
+  - **Total Windows (256s blocks):** 231
+  - **Benign Windows:** 125
+  - **Attack Windows:** 106
+  - **Ratio:** 125:106
+- Both classes exceed the threshold of $\ge 30$ windows required by TASK.md.
+- Blocker B3 is formally closed. Phase P1 passes.
+
