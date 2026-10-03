@@ -6,15 +6,15 @@ import os
 import torch
 from pathlib import Path
 
-# Add project root to Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")))
+# Add src directory to Python path so 'import wmstse' works
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from src.wmstse.data.stream import build_flow_records, build_binned_stream, build_windows
-from src.wmstse.data.splits import split_pa_in_session
-from src.wmstse.features import WMSTSEFeatureExtractor
-from src.wmstse.models.networks import WMSTSEModel
-from src.wmstse.models.train import WMSTSETrainer
-from src.wmstse.eval.metrics import compute_window_metrics, block_bootstrap_ci
+from wmstse.data.stream import build_flow_records, build_binned_stream, build_windows
+from wmstse.data.splits import split_pa_in_session
+from wmstse.features import WMSTSEFeatureExtractor
+from wmstse.models.networks import WMSTSEModel
+from wmstse.models.train import WMSTSETrainer
+from wmstse.eval.metrics import compute_window_metrics, block_bootstrap_ci
 
 def run_final_evaluation(dataset_dir: str, backbone: str):
     print(f"Loading all CSVs from {dataset_dir} for final evaluation...")
