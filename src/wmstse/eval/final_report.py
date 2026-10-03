@@ -6,8 +6,8 @@ import os
 import torch
 from pathlib import Path
 
-# Add src to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+# Add project root to Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")))
 
 from src.wmstse.data.stream import build_flow_records, build_binned_stream, build_windows
 from src.wmstse.data.splits import split_pa_in_session
