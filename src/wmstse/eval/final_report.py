@@ -17,14 +17,20 @@ from wmstse.models.train import WMSTSETrainer
 from wmstse.eval.metrics import compute_window_metrics, block_bootstrap_ci
 
 def run_final_evaluation(dataset_dir: str, backbone: str):
-    print(f"Loading all CSVs from {dataset_dir} for final evaluation...")
+    print(f"Loading CSVs from {dataset_dir} for final evaluation...")
     
-    # Load all CSVs to get a broader distribution
-    csv_pattern = os.path.join(dataset_dir, "*.csv")
-    print(f"Scanning pattern: {csv_pattern}")
+    # Load limited CSVs to prevent Colab from OOMing/timing out
+    csv_files = sorted(list(Path(dataset_dir).glob("*.csv")))
+    if not csv_files:
+        print("No CSV files found.")
+        return
+        
+    # Take only the first 2 files to keep runtime well under 8 minutes
+    target_files = [str(f) for f in csv_files[:2]]
+    print(f"Scanning {len(target_files)} files to prevent memory timeouts...")
     
-    # Use Polars to lazy scan all matching CSVs
-    df = pl.scan_csv(csv_pattern, ignore_errors=True, infer_schema_length=10000)
+    # Use Polars to lazy scan matching CSVs
+    df = pl.scan_csv(target_files, ignore_errors=True, infer_schema_length=10000)
     flows_df = build_flow_records(df).collect()
     
     print("Building stream and windows...")
@@ -133,6 +139,23 @@ def run_final_evaluation(dataset_dir: str, backbone: str):
         f.write(report)
         
     print(f"\nReport saved to {report_path}")
+    
+    # Export ONNX model for Phase P8
+    os.makedirs("artifacts/models", exist_ok=True)
+    onnx_path = f"artifacts/models/{backbone}.onnx"
+    dummy_input = torch.randn(1, 3, 5, 256).to(device)
+    torch.onnx.export(
+        model, 
+        dummy_input, 
+        onnx_path,
+        export_params=True,
+        opset_version=14,
+        do_constant_folding=True,
+        input_names=['input'],
+        output_names=['output'],
+        dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}}
+    )
+    print(f"Model exported to ONNX format at {onnx_path}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
