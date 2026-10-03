@@ -106,7 +106,7 @@ def run_final_evaluation(dataset_dir: str, backbone: str):
 
 ## Configuration
 - **Model Backbone:** {backbone}
-- **Dataset:** {csv_files[0].name}
+- **Dataset Dir:** {dataset_dir}
 - **Window Size:** 256
 - **Test Windows:** {len(test_windows)}
 
