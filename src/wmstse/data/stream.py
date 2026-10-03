@@ -68,7 +68,8 @@ def build_binned_stream(lf: pl.LazyFrame, bin_width_s: float = 1.0) -> pl.LazyFr
         pl.len().alias("n_flows"),
         pl.col("byte_count").sum().alias("sum_bytes"),
         pl.col("packet_count").sum().alias("sum_packets"),
-        pl.col("label_binary").sum().alias("attack_flows")
+        pl.col("label_binary").sum().alias("attack_flows"),
+        pl.col("label_type").mode().first().alias("majority_label_type")
     ]).sort("bin_id")
     
     # Compute channels and handle empty bin zeroes
@@ -94,8 +95,18 @@ def build_windows(binned_df: pl.DataFrame, T: int = 256, stride: int = 8, tau: f
     # Create a continuous range of bin_ids
     full_range = pl.DataFrame({"bin_id": np.arange(min_bin, max_bin + 1, dtype=np.int64)})
     
-    # Join and fill nulls with 0
-    dense_binned = full_range.join(binned_df, on="bin_id", how="left").fill_null(0)
+    # Join and fill nulls
+    dense_binned = full_range.join(binned_df, on="bin_id", how="left")
+    dense_binned = dense_binned.with_columns([
+        pl.col("n_flows").fill_null(0),
+        pl.col("sum_bytes").fill_null(0.0),
+        pl.col("sum_packets").fill_null(0),
+        pl.col("attack_flows").fill_null(0),
+        pl.col("majority_label_type").fill_null("BENIGN"),
+        pl.col("len").fill_null(0.0),
+        pl.col("rate_pkts").fill_null(0.0),
+        pl.col("rate_flows").fill_null(0.0)
+    ])
     
     # We want to extract rolling windows of size T, stride `stride`.
     # To do this efficiently in polars:
@@ -120,9 +131,11 @@ def build_windows(binned_df: pl.DataFrame, T: int = 256, stride: int = 8, tau: f
     # A window ending at index `i + T` (exclusive) has a tail of `tail_bins`.
     attack_flows_arr = dense_binned["attack_flows"].to_numpy()
     n_flows_arr = dense_binned["n_flows"].to_numpy()
+    label_types_arr = dense_binned["majority_label_type"].to_numpy()
     
     labels = []
     attack_fractions = []
+    window_attack_types = []
     
     for start_idx in start_indices:
         end_idx = start_idx + T
@@ -135,13 +148,24 @@ def build_windows(binned_df: pl.DataFrame, T: int = 256, stride: int = 8, tau: f
         
         is_attack = (attack_frac >= tau) and (tail_attack >= min_attack_flows)
         
+        # Determine majority attack type in the window (excluding BENIGN)
+        window_types = label_types_arr[start_idx:end_idx]
+        attack_types = window_types[window_types != "BENIGN"]
+        if len(attack_types) > 0:
+            vals, counts = np.unique(attack_types, return_counts=True)
+            maj_type = vals[np.argmax(counts)]
+        else:
+            maj_type = "BENIGN"
+            
         labels.append(int(is_attack))
         attack_fractions.append(attack_frac)
+        window_attack_types.append(maj_type)
         
     windows_df = pl.DataFrame({
         "window_start_bin": dense_binned["bin_id"].to_numpy()[start_indices],
         "label": labels,
-        "attack_fraction": attack_fractions
+        "attack_fraction": attack_fractions,
+        "majority_attack_type": window_attack_types
     })
     
     return windows_df, dense_binned

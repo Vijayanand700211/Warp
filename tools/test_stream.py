@@ -41,5 +41,13 @@ def main():
     if len(windows) > 0:
         print(windows.head())
 
+    # 4. Splitting
+    from wmstse.data.splits import split_pa_in_session
+    print("\nRunning P-A Split...")
+    split_windows = split_pa_in_session(windows, T=256)
+    
+    split_counts = split_windows.group_by("split").len().sort("split")
+    print(f"Split counts:\n{split_counts}")
+    
 if __name__ == "__main__":
     main()
