@@ -75,8 +75,9 @@ def run_final_evaluation(dataset_dir: str, backbone: str):
                 all_X_test.append(extractor.transform(dense_binned, test_w))
                 all_y_test.append(test_w["label"].to_numpy())
                 
-            # Force garbage collection to free memory
+            import gc
             del df, flows_df, binned_df, windows_df, dense_binned, train_w, val_w, test_w
+            gc.collect()
             
         except Exception as e:
             print(f"  Error processing {file_path.name}: {e}")
