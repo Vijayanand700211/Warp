@@ -137,28 +137,36 @@ def run_deep_audit():
     
     # Create an epoch column in seconds
     window_df = valid_df.with_columns([
-        (pl.col("parsed_time").dt.epoch("s")).alias("epoch_s")
+        (pl.col("parsed_time").dt.epoch("s")).alias("epoch_s"),
+        (pl.col("Label") != "BENIGN").cast(pl.Int32).alias("is_attack")
     ])
     
     # Group by (epoch_s // 256)
-    # Count total flows and attack flows in each window
+    # The label is determined by the trailing 16 bins (seconds 240-255 of the block)
+    # tau >= 0.5 and min_attack_flows >= 5
     window_stats = window_df.with_columns([
         (pl.col("epoch_s") // 256).alias("window_id"),
-        (pl.col("Label") != "BENIGN").cast(pl.Int32).alias("is_attack")
+        (pl.col("epoch_s") % 256 >= 240).alias("in_tail")
     ]).group_by("window_id").agg([
-        pl.len().alias("flow_count"),
-        pl.col("is_attack").sum().alias("attack_flow_count")
+        pl.len().alias("window_total_flows"),
+        pl.col("in_tail").sum().alias("tail_total_flows"),
+        (pl.col("is_attack") & pl.col("in_tail")).sum().alias("tail_attack_flows")
     ]).collect(streaming=True)
     
-    # A window is considered attack if > 0 attack flows (or you can use the τ=0.5 tail rule, but for audit we just check presence)
+    window_stats = window_stats.with_columns([
+        (pl.col("tail_attack_flows") / pl.col("tail_total_flows")).fill_nan(0.0).alias("tail_attack_fraction")
+    ]).with_columns([
+        ((pl.col("tail_attack_fraction") >= 0.5) & (pl.col("tail_attack_flows") >= 5)).alias("is_attack_window")
+    ])
+    
     total_windows = len(window_stats)
-    attack_windows = window_stats.filter(pl.col("attack_flow_count") > 0).height
+    attack_windows = window_stats.filter(pl.col("is_attack_window")).height
     benign_windows = total_windows - attack_windows
     
     report_lines.append("\n## A10 & A11. Window Feasibility (T=256s)")
     report_lines.append(f"- **Total Windows (256s blocks):** {total_windows}")
-    report_lines.append(f"- **Benign Windows (0 attack flows):** {benign_windows}")
-    report_lines.append(f"- **Attack Windows (>0 attack flows):** {attack_windows}")
+    report_lines.append(f"- **Benign Windows (tail attack frac < 0.5 or flows < 5):** {benign_windows}")
+    report_lines.append(f"- **Attack Windows (tail attack frac >= 0.5 and flows >= 5):** {attack_windows}")
     
     report_lines.append(f"\n- **Window Imbalance Ratio (Benign:Attack):** {benign_windows}:{attack_windows}")
     
