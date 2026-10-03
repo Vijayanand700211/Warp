@@ -1,0 +1,25 @@
+[project]
+name = "wmstse"
+version = "0.1.0"
+description = "W-MSTSE Detection Model"
+authors = [{name = "Agent"}]
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "numpy",
+    "pandas",
+    "pyarrow",
+    "polars",
+    "scikit-learn",
+    "xgboost",
+    "PyWavelets",
+    "onnxruntime",
+    "pytest",
+    "httpx"
+]
+requires-python = ">=3.10"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

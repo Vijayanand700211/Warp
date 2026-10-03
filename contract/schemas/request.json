@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "flow_id": {
+      "type": "string"
+    },
+    "tier": {
+      "type": "string",
+      "enum": ["fast", "deep"]
+    },
+    "features": {
+      "type": "object",
+      "properties": {
+        "duration_ms": {
+          "type": "number"
+        },
+        "byte_count": {
+          "type": "number"
+        },
+        "packet_count": {
+          "type": "number"
+        },
+        "protocol": {
+          "type": "string"
+        },
+        "entropy": {
+          "type": "number"
+        },
+        "ja3_hash": {
+          "type": ["string", "null"]
+        },
+        "dns_before_ip": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "duration_ms",
+        "byte_count",
+        "packet_count",
+        "protocol",
+        "entropy",
+        "ja3_hash",
+        "dns_before_ip"
+      ]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "flow_id",
+    "tier",
+    "features",
+    "timestamp"
+  ]
+}
