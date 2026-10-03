@@ -52,6 +52,17 @@ def test_features(csv_path: str):
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--csv", type=str, default="/content/drive/MyDrive/CIC-DDoS2019/01-12/DrDoS_DNS.csv")
+    parser.add_argument("--csv", type=str, default="")
     args = parser.parse_args()
-    test_features(args.csv)
+    
+    csv_path = args.csv
+    if not csv_path:
+        from pathlib import Path
+        d = Path("dataset/CIC-DDoS2019/01-12")
+        if d.exists():
+            csv_path = str(list(d.glob("*.csv"))[0])
+        else:
+            # Fallback for colab root
+            csv_path = "DrDoS_DNS.csv"
+            
+    test_features(csv_path)
