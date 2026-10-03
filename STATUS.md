@@ -1,6 +1,6 @@
-Current phase: P2      Last tag: phase-P1-audit      main green: yes
-Done: P0 (Scaffold, VC, Contract, Stub), P1 (Dataset Validity Audit), P2-stream (Stream binning and splits)
-In progress: P2 (Wavelet decomposition and rolling entropy)
-Blockers: none (B3 resolved)
-Next action: Implement discrete wavelet transform and rolling Shannon entropy feature extraction (TASK.md 8.4 & 8.5)
+Current phase: P3      Last tag: phase-P2-stream-windows      main green: yes
+Done: P0 (Scaffold), P1 (Dataset Audit), P2 (Wavelet/Entropy Features, Stream, Splits)
+In progress: P3 (Model Architecture - ViViT/Spatio-Temporal)
+Blockers: none
+Next action: Implement Spatio-Temporal embeddings and ViT Encoder (TASK.md 8.6)
 
