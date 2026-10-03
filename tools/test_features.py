@@ -23,7 +23,7 @@ def test_features(csv_path: str):
     binned_df = build_binned_stream(flows_df, bin_width_s=1.0).collect()
     
     # 2. Windowing
-    windows_df = build_windows(binned_df, T=256, stride=8)
+    windows_df, _ = build_windows(binned_df, T=256, stride=8)
     
     # 3. Splits
     windows_df = split_pa_in_session(windows_df)
