@@ -18,7 +18,7 @@ def test_features(csv_path: str):
     t0 = time.time()
     
     # 1. Build stream
-    df = pl.scan_csv(csv_path, infer_schema_length=0) # Read as strings first for lazy
+    df = pl.scan_csv(csv_path, ignore_errors=True, infer_schema_length=10000)
     flows_df = build_flow_records(df)
     binned_df = build_binned_stream(flows_df, bin_width_s=1.0).collect()
     
