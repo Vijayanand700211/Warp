@@ -2,6 +2,12 @@ import polars as pl
 import numpy as np
 import argparse
 import time
+import sys
+import os
+
+# Add src to Python path so we can import wmstse
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
 from wmstse.data.stream import build_flow_records, build_binned_stream, build_windows
 from wmstse.data.splits import split_pa_in_session
 from wmstse.features import WMSTSEFeatureExtractor
