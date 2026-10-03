@@ -53,7 +53,7 @@ def run_baselines(csv_path: str):
         preds = []
         for row in win_df.iter_rows(named=True):
             start = row["window_start_bin"]
-            end = row["window_end_bin"]
+            end = start + 256  # T=256 bins
             # Find flows in this time range (using bins as seconds since bin_width=1.0)
             in_window = flows_df.filter(
                 (pl.col("event_ts") / 1e6 >= start) & 
