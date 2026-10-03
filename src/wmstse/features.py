@@ -106,3 +106,29 @@ class WMSTSEFeatureExtractor:
                 X[i, c_idx] = features
                 
         return X
+
+    def save_state(self, path: str):
+        import pickle
+        state = {
+            "T": self.T,
+            "C": self.C,
+            "B": self.B,
+            "wavelet": self.wavelet_transform.wavelet,
+            "level": self.wavelet_transform.level,
+            "K_bins": self.entropy_extractors[0].K,
+            "entropy_edges": [extractor.bin_edges_per_level for extractor in self.entropy_extractors]
+        }
+        with open(path, "wb") as f:
+            pickle.dump(state, f)
+            
+    def load_state(self, path: str):
+        import pickle
+        with open(path, "rb") as f:
+            state = pickle.load(f)
+            
+        self.T = state["T"]
+        self.C = state["C"]
+        self.B = state["B"]
+        for c_idx in range(self.C):
+            self.entropy_extractors[c_idx].K = state["K_bins"]
+            self.entropy_extractors[c_idx].bin_edges_per_level = state["entropy_edges"][c_idx]

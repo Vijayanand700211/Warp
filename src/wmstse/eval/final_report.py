@@ -192,6 +192,11 @@ def run_final_evaluation(dataset_dir: str, backbone: str):
         dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}}
     )
     print(f"Model exported to ONNX format at {onnx_path}")
+    
+    # Save feature extractor state (e.g. dynamic entropy bucket edges)
+    extractor_path = f"artifacts/models/{backbone}_extractor.pkl"
+    extractor.save_state(extractor_path)
+    print(f"Feature extractor state saved to {extractor_path}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
