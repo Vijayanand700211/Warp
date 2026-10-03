@@ -19,46 +19,81 @@ from wmstse.eval.metrics import compute_window_metrics, block_bootstrap_ci
 def run_final_evaluation(dataset_dir: str, backbone: str):
     print(f"Loading CSVs from {dataset_dir} for final evaluation...")
     
-    # Load limited CSVs to prevent Colab from OOMing/timing out
     csv_files = sorted(list(Path(dataset_dir).glob("*.csv")))
     if not csv_files:
         print("No CSV files found.")
         return
         
-    # Take only the first 2 files to keep runtime well under 8 minutes
-    target_files = [str(f) for f in csv_files[:2]]
-    print(f"Scanning {len(target_files)} files to prevent memory timeouts...")
+    print(f"Found {len(csv_files)} files. Processing one by one to save memory...")
     
-    # Use Polars to lazy scan matching CSVs
-    df = pl.scan_csv(target_files, ignore_errors=True, infer_schema_length=10000)
-    flows_df = build_flow_records(df).collect()
+    all_X_train, all_y_train = [], []
+    all_X_val, all_y_val = [], []
+    all_X_test, all_y_test = [], []
     
-    print("Building stream and windows...")
-    binned_df = build_binned_stream(flows_df.lazy(), bin_width_s=1.0).collect()
-    windows_df, dense_binned = build_windows(binned_df, T=256, stride=8)
-    windows_df = split_pa_in_session(windows_df)
-    
-    train_windows = windows_df.filter(pl.col("split") == "train")
-    val_windows = windows_df.filter(pl.col("split") == "val")
-    test_windows = windows_df.filter(pl.col("split") == "test")
-    
-    print(f"Windows - Train: {len(train_windows)}, Val: {len(val_windows)}, Test: {len(test_windows)}")
-    
-    if len(train_windows) == 0 or len(test_windows) == 0:
-        print("Not enough windows to evaluate!")
-        return
-
-    print("Extracting features...")
     extractor = WMSTSEFeatureExtractor(T=256, wavelet="db4", level=4, K_bins=16)
-    extractor.fit(dense_binned, train_windows)
+    extractor_fitted = False
     
-    X_train = extractor.transform(dense_binned, train_windows)
-    X_val = extractor.transform(dense_binned, val_windows)
-    X_test = extractor.transform(dense_binned, test_windows)
+    for i, file_path in enumerate(csv_files):
+        print(f"\n[{i+1}/{len(csv_files)}] Processing {file_path.name}...")
+        try:
+            df = pl.scan_csv(str(file_path), ignore_errors=True, infer_schema_length=10000)
+            flows_df = build_flow_records(df).collect()
+            
+            if len(flows_df) == 0:
+                print("  Skipping (no valid flows).")
+                continue
+                
+            binned_df = build_binned_stream(flows_df.lazy(), bin_width_s=1.0).collect()
+            windows_df, dense_binned = build_windows(binned_df, T=256, stride=8)
+            
+            if len(windows_df) == 0:
+                print("  Skipping (no valid windows).")
+                continue
+                
+            windows_df = split_pa_in_session(windows_df)
+            
+            train_w = windows_df.filter(pl.col("split") == "train")
+            val_w = windows_df.filter(pl.col("split") == "val")
+            test_w = windows_df.filter(pl.col("split") == "test")
+            
+            print(f"  Extracted Windows - Train: {len(train_w)}, Val: {len(val_w)}, Test: {len(test_w)}")
+            
+            if not extractor_fitted and len(train_w) > 0:
+                print("  Fitting feature extractor on this file's train split...")
+                extractor.fit(dense_binned, train_w)
+                extractor_fitted = True
+                
+            if len(train_w) > 0 and extractor_fitted:
+                all_X_train.append(extractor.transform(dense_binned, train_w))
+                all_y_train.append(train_w["label"].to_numpy())
+                
+            if len(val_w) > 0 and extractor_fitted:
+                all_X_val.append(extractor.transform(dense_binned, val_w))
+                all_y_val.append(val_w["label"].to_numpy())
+                
+            if len(test_w) > 0 and extractor_fitted:
+                all_X_test.append(extractor.transform(dense_binned, test_w))
+                all_y_test.append(test_w["label"].to_numpy())
+                
+            # Force garbage collection to free memory
+            del df, flows_df, binned_df, windows_df, dense_binned, train_w, val_w, test_w
+            
+        except Exception as e:
+            print(f"  Error processing {file_path.name}: {e}")
+            
+    if not all_X_train or not all_X_test:
+        print("Not enough windows extracted to train and evaluate!")
+        return
+        
+    print("\nConcatenating tensors...")
+    X_train = np.concatenate(all_X_train, axis=0)
+    y_train = np.concatenate(all_y_train, axis=0)
+    X_val = np.concatenate(all_X_val, axis=0) if all_X_val else np.array([])
+    y_val = np.concatenate(all_y_val, axis=0) if all_y_val else np.array([])
+    X_test = np.concatenate(all_X_test, axis=0)
+    y_test = np.concatenate(all_y_test, axis=0)
     
-    y_train = train_windows["label"].to_numpy()
-    y_val = val_windows["label"].to_numpy()
-    y_test = test_windows["label"].to_numpy()
+    print(f"Total Windows - Train: {len(X_train)}, Val: {len(X_val)}, Test: {len(X_test)}")
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"\nTraining {backbone} on {device}...")
