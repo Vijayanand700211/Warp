@@ -67,19 +67,29 @@ def split_pa_in_session(windows_df: pl.DataFrame, T: int = 256) -> pl.DataFrame:
             continue
             
         # Split 70 / 15 / 15 of the active windows (excluding the gaps from the percentages)
-        # To be safe, we just take proportions of the raw length, then drop the gap boundaries
-        n_train_raw = int(0.70 * n_windows)
-        n_val_raw = int(0.15 * n_windows)
+        usable_windows = n_windows - 2 * gap_windows
+        if usable_windows < 3:
+            continue
+            
+        n_train_raw = int(0.70 * usable_windows)
+        n_val_raw = int(0.15 * usable_windows)
+        
+        # Ensure at least 1 window per split if possible
+        if n_train_raw == 0: n_train_raw = 1
+        if n_val_raw == 0: n_val_raw = 1
         
         train_end = n_train_raw
         val_start = train_end + gap_windows
         val_end = val_start + n_val_raw
         test_start = val_end + gap_windows
         
-        # If test_start pushes beyond bounds due to rounding, adjust
+        # If test_start pushes beyond bounds due to rounding, adjust test_start
+        # If it still overflows, just put all in train
         if test_start >= n_windows:
-            # Revert to all train if we can't fit
-            continue
+            if val_end + gap_windows < n_windows:
+                test_start = val_end + gap_windows
+            else:
+                continue
             
         # Assign splits
         # The default is "train" which is already set
@@ -94,5 +104,69 @@ def split_pa_in_session(windows_df: pl.DataFrame, T: int = 256) -> pl.DataFrame:
     )
     
     # Filter out dropped gap windows
+    return out_df.filter(pl.col("split") != "drop")
+
+
+def split_pb_cross_session(windows_df: pl.DataFrame, T: int = 256) -> pl.DataFrame:
+    """
+    Implements P-B split: cross-session (generalization).
+    Train/val from earlier capture day(s), test from the later day.
+    Val = last 15% blocks of the train day with gaps.
+    Mark N/A if timestamps expose only one day.
+    """
+    if len(windows_df) == 0:
+        return windows_df.with_columns(pl.lit("train").alias("split"))
+
+    # Convert start bins to days
+    # Since bin_width_s = 1.0 (default), bin_id is epoch_s.
+    # epoch_s // 86400 gives the day.
+    start_bins = windows_df["window_start_bin"].to_numpy()
+    days = start_bins // 86400
+    unique_days = np.unique(days)
+    
+    if len(unique_days) <= 1:
+        # Cannot do cross-session split on a single day.
+        # Fallback to P-A or all train. We will just return all train with a warning.
+        logging.warning("P-B split requested but only one day of data found. Falling back to all train.")
+        return windows_df.with_columns(pl.lit("train").alias("split"))
+        
+    last_day = unique_days[-1]
+    
+    # Test is the last day
+    test_mask = (days == last_day)
+    train_val_mask = ~test_mask
+    
+    train_val_indices = np.where(train_val_mask)[0]
+    n_train_val = len(train_val_indices)
+    
+    splits = np.array(["train"] * len(windows_df), dtype=object)
+    splits[test_mask] = "test"
+    
+    # Val is the last 15% of the train_val day(s) with gaps
+    if n_train_val > 1:
+        stride = np.median(np.diff(start_bins[train_val_indices]))
+        gap_windows = int(np.ceil(T / stride)) if stride > 0 else 0
+    else:
+        gap_windows = 0
+        
+    # We want 15% of usable windows for val
+    usable_windows = n_train_val - gap_windows
+    
+    if usable_windows >= 2:
+        n_val_raw = int(0.15 * usable_windows)
+        if n_val_raw == 0: n_val_raw = 1
+        
+        val_end = n_train_val
+        val_start = val_end - n_val_raw
+        train_end = val_start - gap_windows
+        
+        if train_end > 0:
+            splits[train_val_indices[train_end:val_start]] = "drop"
+            splits[train_val_indices[val_start:val_end]] = "val"
+        
+    out_df = windows_df.with_columns(
+        pl.Series("split", splits)
+    )
+    
     return out_df.filter(pl.col("split") != "drop")
 
